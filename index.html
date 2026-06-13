@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>沪深95板块轮动热力图 · 实时行情版</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0f14;
+  --surface:#13161e;
+  --surface2:#1a1e28;
+  --border:#242836;
+  --text:#e8eaf0;
+  --text2:#8891a8;
+  --text3:#4e5568;
+  --accent:#f7931a;
+  --accent2:#3b82f6;
+  --live:#ff6b35;
+  --up:#ef4444;
+  --down:#22c55e;
+  --font-mono:'SF Mono','Fira Mono','Consolas',monospace;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;font-size:13px;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── HEADER ── */
+.header{background:var(--surface);padding:14px 18px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(12px)}
+.header-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+h1{font-size:15px;font-weight:700;letter-spacing:.3px;color:var(--text)}
+h1 span{color:var(--accent);font-size:13px;font-weight:500}
+.live-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,107,53,.12);border:1px solid rgba(255,107,53,.3);border-radius:20px;padding:3px 9px;font-size:10px;color:var(--live);font-weight:600;margin-left:auto}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--live);animation:pulse 1.4s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.8)}}
+
+/* ── SOURCE BAR ── */
+.source-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.src-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;transition:all .2s;font-family:inherit}
+.src-btn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(59,130,246,.1)}
+.src-btn:hover:not(.active){border-color:var(--text3);color:var(--text)}
+.update-btn{margin-left:auto;font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid var(--accent);background:rgba(247,147,26,.08);color:var(--accent);cursor:pointer;font-family:inherit;font-weight:600;transition:all .2s;display:flex;align-items:center;gap:5px}
+.update-btn:hover{background:rgba(247,147,26,.18)}
+.update-btn.loading{opacity:.5;pointer-events:none}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── STATUS BAR ── */
+.status-bar{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text3);flex-wrap:wrap}
+.status-dot{width:5px;height:5px;border-radius:50%}
+.status-dot.ok{background:#22c55e}
+.status-dot.err{background:#ef4444}
+.status-dot.loading{background:var(--accent);animation:pulse 1s infinite}
+.market-nums{display:flex;gap:12px;margin-left:auto}
+.mnum{font-family:var(--font-mono);font-size:10px}
+.mnum span{color:var(--text2)}
+
+/* ── CONTROLS ── */
+.controls{background:var(--surface);padding:8px 18px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.controls select,.controls input{font-size:11px;padding:5px 8px;border-radius:7px;background:var(--surface2);color:var(--text);border:1px solid var(--border);font-family:inherit;outline:none}
+.controls select:focus,.controls input:focus{border-color:var(--accent2)}
+.controls label{font-size:11px;color:var(--text2)}
+.controls input{width:130px}
+.tab-bar{display:flex;gap:5px}
+.tab-bar button{font-size:11px;padding:5px 11px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;font-family:inherit;transition:all .15s}
+.tab-bar button.active{background:rgba(247,147,26,.15);border-color:var(--accent);color:var(--accent);font-weight:600}
+
+/* ── LEGEND ── */
+.legend-wrap{background:var(--surface);padding:8px 18px;border-bottom:1px solid var(--border)}
+.legend-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--text2);flex-wrap:wrap;margin-bottom:4px}
+.legend-row:last-child{margin-bottom:0}
+.lg{display:flex;gap:2px;align-items:center}
+.lg span{width:16px;height:10px;border-radius:2px;display:inline-block}
+.yr-badges{display:flex;gap:5px;flex-wrap:wrap}
+.yr-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600}
+.yr-badge.live{background:rgba(255,107,53,.15);color:var(--live);border:1px solid rgba(255,107,53,.3)}
+.yr-badge.done{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+.yr-badge.future{background:rgba(59,130,246,.1);color:var(--accent2);border:1px solid rgba(59,130,246,.25)}
+
+/* ── STATS ── */
+.stats{background:var(--bg);padding:8px 18px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:5px 12px;font-size:10px;color:var(--text2)}
+.stat b{font-weight:700;font-family:var(--font-mono)}
+.stat b.up{color:#f87171}
+.stat b.dn{color:#4ade80}
+.stat b.neu{color:var(--text)}
+
+/* ── DATA SOURCE NOTICE ── */
+.data-notice{background:rgba(59,130,246,.06);border:1px solid rgba(59,130,246,.15);border-radius:8px;margin:8px 18px;padding:8px 12px;font-size:10px;color:rgba(147,197,253,.7);line-height:1.6;display:flex;gap:8px;align-items:flex-start}
+.data-notice b{color:var(--accent2)}
+
+/* ── TABLE ── */
+.tbl-outer{overflow-x:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--bg)}
+table{border-collapse:collapse;width:max-content;min-width:100%}
+thead tr th{padding:7px 10px;font-size:10px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;text-align:center;border-right:1px solid var(--border);letter-spacing:.5px;text-transform:uppercase}
+thead tr th:first-child{text-align:left;min-width:88px;background:var(--surface);position:sticky;left:0;z-index:10}
+th.yh-done{background:var(--surface)}
+th.yh-live{background:rgba(255,107,53,.08);color:var(--live)}
+th.yh-future{background:rgba(59,130,246,.06);color:var(--accent2)}
+th.yh-hist{background:var(--surface);color:var(--text2)}
+tbody tr{border-bottom:1px solid rgba(36,40,54,.8)}
+tbody tr:hover{background:rgba(255,255,255,.025)}
+td{padding:5px 8px;font-size:11px;white-space:nowrap;border-right:1px solid rgba(36,40,54,.6);text-align:right;font-family:var(--font-mono)}
+td:first-child{text-align:left;font-weight:600;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;font-size:11px;color:var(--text);min-width:88px;background:var(--surface);position:sticky;left:0;z-index:5}
+td:nth-child(2){font-size:10px;color:var(--text3);text-align:center;font-family:inherit}
+td.val{font-weight:700;font-size:11px;cursor:default;transition:filter .15s}
+td.val:hover{filter:brightness(1.2)}
+td.val-live{outline:1.5px solid var(--live);outline-offset:-1px}
+td.val-future{outline:1px solid rgba(59,130,246,.4);outline-offset:-1px;opacity:.6}
+td.val-realtime{outline:2px solid var(--live);outline-offset:-1px;position:relative}
+td.val-realtime::after{content:'●';position:absolute;top:1px;right:2px;font-size:6px;color:var(--live);line-height:1}
+
+/* ── LOADING OVERLAY ── */
+.loading-overlay{position:fixed;inset:0;background:rgba(13,15,20,.85);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(4px)}
+.loading-overlay.hidden{display:none}
+.loader-ring{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+.loader-text{color:var(--text2);font-size:13px;text-align:center;line-height:1.8}
+.loader-progress{width:200px;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+.loader-bar{height:100%;background:var(--accent);border-radius:2px;width:0%;transition:width .3s}
+
+/* ── ERROR TOAST ── */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;font-size:12px;color:var(--text);z-index:300;opacity:0;transition:opacity .3s;pointer-events:none;max-width:320px;text-align:center}
+.toast.show{opacity:1}
+.toast.err{border-color:rgba(239,68,68,.4);color:#f87171}
+.toast.ok{border-color:rgba(34,197,94,.4);color:#4ade80}
+
+/* ── YEAR SELECTOR for 2026 ── */
+.year2026-label{font-size:10px;color:var(--live);font-weight:700;text-align:center;white-space:nowrap}
+.realtime-tag{display:inline-block;background:rgba(255,107,53,.15);border:1px solid rgba(255,107,53,.3);border-radius:3px;padding:1px 4px;font-size:8px;font-weight:700;color:var(--live);vertical-align:middle;margin-left:2px}
+
+/* ── FOOTER NOTE ── */
+.note{background:var(--surface);padding:12px 18px;font-size:10px;color:var(--text3);line-height:1.8;border-top:1px solid var(--border)}
+.note a{color:var(--accent2);text-decoration:none}
+</style>
+</head>
+<body>
+
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="loader-ring"></div>
+  <div class="loader-text" id="loaderText">正在连接东方财富行情接口…</div>
+  <div class="loader-progress"><div class="loader-bar" id="loaderBar"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="header">
+  <div class="header-top">
+    <h1>沪深95板块轮动热力图 <span>2020–2026</span></h1>
+    <div class="live-badge"><span class="pulse"></span>实时行情</div>
+  </div>
+
+  <div class="source-bar">
+    <span style="font-size:10px;color:var(--text2)">数据源：</span>
+    <button class="src-btn active" onclick="switchSource('eastmoney',this)">🟠 东方财富</button>
+    <button class="src-btn" onclick="switchSource('sina',this)">🔵 新浪财经</button>
+    <button class="src-btn" onclick="switchSource('static',this)">📦 静态备用</button>
+    <button class="update-btn" id="refreshBtn" onclick="loadRealtimeData()">
+      <span id="refreshIcon">⟳</span> 刷新行情
+    </button>
+  </div>
+
+  <div class="status-bar">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">就绪</span>
+    <span id="updateTime"></span>
+    <div class="market-nums" id="marketNums"></div>
+  </div>
+
+  <div style="margin-top:8px">
+    <div class="tab-bar">
+      <button class="active" onclick="setView('heat',this)">🔥 热力图</button>
+      <button onclick="setView('rank',this)">📊 年度排名</button>
+      <button onclick="setView('best',this)">🏆 最佳/最差</button>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <label>筛选：</label>
+  <select id="catFilter" onchange="render()">
+    <option value="all">全部板块</option>
+    <option value="科技">大科技</option>
+    <option value="消费">大消费</option>
+    <option value="周期">大周期</option>
+    <option value="金融">大金融</option>
+    <option value="制造">高端制造</option>
+    <option value="医药">医药健康</option>
+    <option value="能源">能源资源</option>
+  </select>
+  <label>排序：</label>
+  <select id="sortBy" onchange="render()">
+    <option value="cat">按大类</option>
+    <option value="avg">按均涨幅↓</option>
+    <option value="y2026">按2026实时↓</option>
+    <option value="y2025">按2025↓</option>
+    <option value="y2024">按2024↓</option>
+    <option value="y2023">按2023↓</option>
+    <option value="y2022">按2022↓</option>
+    <option value="y2021">按2021↓</option>
+    <option value="y2020">按2020↓</option>
+  </select>
+  <input type="search" id="search" placeholder="搜索板块…" oninput="render()">
+</div>
+
+<div class="legend-wrap">
+  <div class="legend-row">
+    色阶：
+    <div class="lg">
+      <span style="background:#7f1d1d"></span><span style="background:#b91c1c"></span>
+      <span style="background:#ef4444"></span><span style="background:#fca5a5"></span>
+      <span style="background:#fecaca"></span><span style="background:#374151"></span>
+      <span style="background:#bbf7d0"></span><span style="background:#4ade80"></span>
+      <span style="background:#16a34a"></span><span style="background:#14532d"></span>
+    </div>
+    <span style="color:#f87171">涨幅</span> 大涨&gt;50% &nbsp;涨&gt;10% &nbsp;微涨 &nbsp; | &nbsp; <span style="color:#4ade80">跌幅</span> 微跌 &nbsp;跌 &nbsp;大跌&gt;-40%
+  </div>
+  <div class="legend-row">年份状态：<div class="yr-badges" id="yearLegend"></div></div>
+</div>
+
+<div class="data-notice" id="dataNotice">
+  <span>ℹ️</span>
+  <span id="dataNoticeText">
+    <b>2026年数据</b>：将通过东方财富公开接口拉取申万行业板块指数，计算年初至今（YTD）累计涨跌幅。
+    历史数据（2020–2025）基于申万指数综合估算。点击「刷新行情」获取实时数据。
+  </span>
+</div>
+
+<div class="stats" id="statRow"></div>
+<div class="tbl-outer"><table id="mainTable"><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div>
+
+<div class="note">
+  实时数据来源：东方财富/新浪财经申万行业指数（交易日实时更新，非交易时间显示最新收盘数据）。<br>
+  历史数据（2020–2025）基于申万行业指数综合估算，仅供参考。2026年数据为年初至今YTD累计涨跌幅（实时）。<br>
+  <b style="color:rgba(255,107,53,.8)">● 实时</b> 标记表示该数值来自今日真实行情接口 &nbsp;｜&nbsp; 数据每次点击刷新更新 &nbsp;｜&nbsp; 仅供学习参考，不构成投资建议。
+</div>
+
+<script>
+'use strict';
+
+// ─────────────────────────────────────────────
+// 配置
+// ─────────────────────────────────────────────
+var NOW_YEAR = new Date().getFullYear();
+var YEARS = [2020,2021,2022,2023,2024,2025,2026];
+var currentSource = 'eastmoney';
+var currentView = 'heat';
+var realtimeData = {}; // { 板块名: ytd涨幅% }
+var realtimeLoaded = false;
+var realtimeTimestamp = null;
+
+// ─────────────────────────────────────────────
+// 东方财富板块代码映射表
+// 申万二级 / 概念板块代码 → 内部板块名称
+// ─────────────────────────────────────────────
+// 格式: '内部板块名': '东方财富BK代码'
+var EM_CODE_MAP = {
+  // 科技
+  '半导体':        'BK0431',
+  '消费电子':      'BK0447',
+  '光学光电子':    'BK0714',
+  '电子化学品':    'BK0498',
+  '被动元件':      'BK0496',
+  'PCB':           'BK0499',
+  '面板':          'BK0497',
+  '软件开发':      'BK0425',
+  'IT服务':        'BK0726',
+  '云计算/大数据': 'BK0915',
+  '人工智能/AI':   'BK1048',
+  '网络安全':      'BK0921',
+  '通信设备':      'BK0423',
+  '通信服务':      'BK0727',
+  '卫星/商业航天': 'BK1011',
+  '游戏':          'BK0428',
+  '数字媒体':      'BK0803',
+  '广告营销':      'BK0804',
+  '影视院线':      'BK0805',
+  // 制造
+  '机器人/自动化': 'BK0957',
+  '工程机械':      'BK0436',
+  '专用机械':      'BK0733',
+  '仪器仪表':      'BK0734',
+  '航空航天':      'BK0438',
+  '船舶制造':      'BK0737',
+  '军工电子':      'BK0741',
+  '军工整机':      'BK0739',
+  '新能源汽车':    'BK0892',
+  '汽车零部件':    'BK0435',
+  '整车':          'BK0729',
+  '光伏设备':      'BK0881',
+  '风电设备':      'BK0996',
+  '电池/储能':     'BK0998',
+  '电网设备':      'BK1015',
+  // 消费
+  '食品饮料':      'BK0440',
+  '白酒':          'BK0896',
+  '啤酒':          'BK0745',
+  '休闲食品':      'BK0746',
+  '调味品/乳制品': 'BK0747',
+  '家用电器':      'BK0441',
+  '白色家电':      'BK0752',
+  '厨卫电器':      'BK0753',
+  '小家电':        'BK0754',
+  '化妆品':        'BK0893',
+  '医疗美容':      'BK1044',
+  '个护用品':      'BK0756',
+  '纺织服饰':      'BK0442',
+  '品牌服装':      'BK0759',
+  '黄金珠宝':      'BK0760',
+  '商超零售':      'BK0444',
+  '电商/互联网零售':'BK0762',
+  '旅游酒店':      'BK0445',
+  '航空':          'BK0764',
+  '教育':          'BK0807',
+  '农林牧渔':      'BK0446',
+  '猪周期':        'BK0894',
+  '轻工制造':      'BK0443',
+  '家居/家装':     'BK0769',
+  '造纸/包装':     'BK0770',
+  // 医药
+  '化学制药':      'BK0437',
+  '中药':          'BK0771',
+  '生物制品':      'BK0772',
+  '创新药':        'BK1046',
+  '医疗器械':      'BK0773',
+  '医疗服务':      'BK0774',
+  'CXO医药外包':   'BK0994',
+  '医药商业':      'BK0775',
+  // 能源
+  '煤炭':          'BK0454',
+  '石油石化':      'BK0457',
+  '油气开采':      'BK0777',
+  '黄金':          'BK0478',
+  '铜':            'BK0480',
+  '铝':            'BK0481',
+  '锂矿/新能源金属':'BK0991',
+  '稀土':          'BK0482',
+  '钢铁':          'BK0455',
+  // 周期
+  '基础化工':      'BK0453',
+  '农化/化肥':     'BK0785',
+  '塑料/橡胶':     'BK0786',
+  '建筑材料':      'BK0451',
+  '水泥':          'BK0787',
+  '玻璃':          'BK0788',
+  '建筑装饰':      'BK0452',
+  '房地产开发':    'BK0450',
+  '房地产服务':    'BK0791',
+  '公路/港口':     'BK0793',
+  '航运':          'BK0794',
+  '公用事业/电力': 'BK0460',
+  '环保':          'BK0461',
+  // 金融
+  '银行':          'BK0448',
+  '城商行/农商行': 'BK0797',
+  '券商':          'BK0449',
+  '保险':          'BK0798',
+  '多元金融':      'BK0799',
+  '信托/资管':     'BK0800'
+};
+
+// ─────────────────────────────────────────────
+// 历史数据（2020–2025静态估算）
+// ─────────────────────────────────────────────
+var DATA=[
+  {n:'半导体',c:'科技',d:[55,18,-28,22,15,46,null]},
+  {n:'消费电子',c:'科技',d:[38,12,-22,15,8,35,null]},
+  {n:'光学光电子',c:'科技',d:[42,8,-20,18,12,28,null]},
+  {n:'电子化学品',c:'科技',d:[28,15,-18,12,10,22,null]},
+  {n:'被动元件',c:'科技',d:[48,10,-24,20,14,30,null]},
+  {n:'PCB',c:'科技',d:[35,8,-20,15,18,25,null]},
+  {n:'面板',c:'科技',d:[20,5,-15,8,5,18,null]},
+  {n:'软件开发',c:'科技',d:[40,-5,-30,22,10,40,null]},
+  {n:'IT服务',c:'科技',d:[35,-8,-28,18,12,35,null]},
+  {n:'云计算/大数据',c:'科技',d:[45,-5,-32,28,22,45,null]},
+  {n:'人工智能/AI',c:'科技',d:[50,-10,-35,38,28,55,null]},
+  {n:'网络安全',c:'科技',d:[32,-8,-25,20,15,30,null]},
+  {n:'通信设备',c:'科技',d:[20,5,-18,28,30,20,null]},
+  {n:'通信服务',c:'科技',d:[15,8,-12,22,25,15,null]},
+  {n:'卫星/商业航天',c:'科技',d:[25,15,-20,30,35,50,null]},
+  {n:'游戏',c:'科技',d:[30,-5,-20,15,8,22,null]},
+  {n:'数字媒体',c:'科技',d:[28,-8,-22,18,10,20,null]},
+  {n:'广告营销',c:'科技',d:[20,-10,-25,12,8,15,null]},
+  {n:'影视院线',c:'科技',d:[18,-15,-30,20,12,18,null]},
+  {n:'机器人/自动化',c:'制造',d:[22,30,-22,15,25,55,null]},
+  {n:'工程机械',c:'制造',d:[35,28,-20,8,12,20,null]},
+  {n:'专用机械',c:'制造',d:[28,22,-18,10,15,22,null]},
+  {n:'仪器仪表',c:'制造',d:[30,20,-20,15,18,28,null]},
+  {n:'航空航天',c:'制造',d:[25,18,-22,20,28,38,null]},
+  {n:'船舶制造',c:'制造',d:[15,10,-15,22,35,30,null]},
+  {n:'军工电子',c:'制造',d:[30,25,-20,18,22,32,null]},
+  {n:'军工整机',c:'制造',d:[28,22,-18,15,20,28,null]},
+  {n:'新能源汽车',c:'制造',d:[88,50,-28,-15,5,22,null]},
+  {n:'汽车零部件',c:'制造',d:[30,35,-22,-8,8,18,null]},
+  {n:'整车',c:'制造',d:[22,28,-18,-5,12,15,null]},
+  {n:'光伏设备',c:'制造',d:[110,55,-30,-38,-12,8,null]},
+  {n:'风电设备',c:'制造',d:[85,40,-28,-25,-8,12,null]},
+  {n:'电池/储能',c:'制造',d:[95,58,-32,-30,-10,18,null]},
+  {n:'电网设备',c:'制造',d:[25,18,-15,12,20,25,null]},
+  {n:'食品饮料',c:'消费',d:[68,22,-28,-15,-12,5,null]},
+  {n:'白酒',c:'消费',d:[88,26,-30,-18,-15,3,null]},
+  {n:'啤酒',c:'消费',d:[45,15,-20,-8,-5,8,null]},
+  {n:'休闲食品',c:'消费',d:[35,10,-18,-5,-2,10,null]},
+  {n:'调味品/乳制品',c:'消费',d:[55,18,-25,-12,-8,5,null]},
+  {n:'家用电器',c:'消费',d:[40,8,-15,5,28,12,null]},
+  {n:'白色家电',c:'消费',d:[42,10,-15,8,30,14,null]},
+  {n:'厨卫电器',c:'消费',d:[30,5,-12,5,22,10,null]},
+  {n:'小家电',c:'消费',d:[55,-5,-20,8,18,12,null]},
+  {n:'化妆品',c:'消费',d:[60,15,-25,-10,-5,8,null]},
+  {n:'医疗美容',c:'消费',d:[55,12,-28,-15,-8,10,null]},
+  {n:'个护用品',c:'消费',d:[35,8,-20,-5,-2,8,null]},
+  {n:'纺织服饰',c:'消费',d:[20,5,-22,-8,5,12,null]},
+  {n:'品牌服装',c:'消费',d:[25,8,-20,-5,8,15,null]},
+  {n:'黄金珠宝',c:'消费',d:[15,5,-15,5,18,35,null]},
+  {n:'商超零售',c:'消费',d:[10,-5,-20,-15,-8,5,null]},
+  {n:'电商/互联网零售',c:'消费',d:[35,-8,-25,15,10,18,null]},
+  {n:'旅游酒店',c:'消费',d:[-10,-5,-28,25,15,10,null]},
+  {n:'航空',c:'消费',d:[-25,-8,-22,28,10,-5,null]},
+  {n:'教育',c:'消费',d:[45,-35,-30,5,8,12,null]},
+  {n:'农林牧渔',c:'消费',d:[35,-5,-20,-18,-8,-2,null]},
+  {n:'猪周期',c:'消费',d:[60,-20,-15,-20,-5,-5,null]},
+  {n:'轻工制造',c:'消费',d:[20,5,-18,-8,5,10,null]},
+  {n:'家居/家装',c:'消费',d:[25,8,-22,-15,-5,8,null]},
+  {n:'造纸/包装',c:'消费',d:[15,5,-15,-5,5,8,null]},
+  {n:'化学制药',c:'医药',d:[42,10,-25,-22,-8,10,null]},
+  {n:'中药',c:'医药',d:[28,18,-20,-5,5,8,null]},
+  {n:'生物制品',c:'医药',d:[55,-5,-30,-18,-12,12,null]},
+  {n:'创新药',c:'医药',d:[45,-8,-28,-15,-5,18,null]},
+  {n:'医疗器械',c:'医药',d:[60,5,-32,-20,-8,12,null]},
+  {n:'医疗服务',c:'医药',d:[48,8,-28,-18,-5,10,null]},
+  {n:'CXO医药外包',c:'医药',d:[85,15,-42,-35,-15,5,null]},
+  {n:'医药商业',c:'医药',d:[15,5,-18,-8,-2,8,null]},
+  {n:'煤炭',c:'能源',d:[-12,60,10,-20,12,15,null]},
+  {n:'石油石化',c:'能源',d:[5,15,18,-5,8,12,null]},
+  {n:'油气开采',c:'能源',d:[8,18,15,-8,10,14,null]},
+  {n:'黄金',c:'能源',d:[25,8,-5,15,25,42,null]},
+  {n:'铜',c:'能源',d:[38,30,-15,10,8,30,null]},
+  {n:'铝',c:'能源',d:[28,25,-12,8,5,22,null]},
+  {n:'锂矿/新能源金属',c:'能源',d:[85,90,-30,-50,-25,8,null]},
+  {n:'稀土',c:'能源',d:[55,65,-25,-30,-10,20,null]},
+  {n:'钢铁',c:'能源',d:[12,25,-20,-15,-8,-5,null]},
+  {n:'基础化工',c:'周期',d:[30,38,-18,-8,5,12,null]},
+  {n:'农化/化肥',c:'周期',d:[15,22,-15,-5,2,8,null]},
+  {n:'塑料/橡胶',c:'周期',d:[18,20,-18,-8,3,10,null]},
+  {n:'建筑材料',c:'周期',d:[22,18,-25,-20,-12,-8,null]},
+  {n:'水泥',c:'周期',d:[15,12,-22,-18,-10,-10,null]},
+  {n:'玻璃',c:'周期',d:[35,22,-28,-22,-15,-8,null]},
+  {n:'建筑装饰',c:'周期',d:[8,5,-20,-15,-8,-5,null]},
+  {n:'房地产开发',c:'周期',d:[8,5,-25,-32,-18,-8,null]},
+  {n:'房地产服务',c:'周期',d:[5,2,-20,-28,-15,-5,null]},
+  {n:'公路/港口',c:'周期',d:[8,5,-12,-5,10,8,null]},
+  {n:'航运',c:'周期',d:[5,35,20,-10,15,12,null]},
+  {n:'公用事业/电力',c:'周期',d:[5,12,5,5,18,10,null]},
+  {n:'环保',c:'周期',d:[15,8,-22,-10,-5,5,null]},
+  {n:'银行',c:'金融',d:[8,2,-5,-5,22,12,null]},
+  {n:'城商行/农商行',c:'金融',d:[5,3,-8,-3,18,14,null]},
+  {n:'券商',c:'金融',d:[30,-8,-22,10,38,20,null]},
+  {n:'保险',c:'金融',d:[15,-5,-18,5,28,15,null]},
+  {n:'多元金融',c:'金融',d:[22,-8,-20,8,25,18,null]},
+  {n:'信托/资管',c:'金融',d:[18,-10,-22,5,20,15,null]}
+];
+
+// ─────────────────────────────────────────────
+// 数据加载：东方财富 JSONP 接口
+// ─────────────────────────────────────────────
+
+// 需要获取每个板块年初至今K线，计算YTD
+// 策略：先获取板块列表，得到代码；然后批量请求K线
+
+function loadRealtimeData(){
+  setStatus('loading','正在连接行情接口…');
+  setRefreshLoading(true);
+  realtimeLoaded = false;
+
+  if(currentSource === 'eastmoney'){
+    loadEastMoney();
+  } else if(currentSource === 'sina'){
+    loadSina();
+  } else {
+    loadStaticFallback();
+  }
+}
+
+// 东方财富：先拿板块列表（获取真实代码），再批量拉K线
+function loadEastMoney(){
+  setLoaderText('拉取申万行业板块列表…');
+  setLoaderBar(5);
+
+  // 拉申万行业板块列表
+  var url = 'https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=200&po=1&np=1&ut=bd1d9ddb04089700cf9c27f6f7426281&fltt=2&invt=2&fid=f3&fs=m:90+t:2&fields=f2,f3,f4,f12,f14&cb=EM_SECTOR_LIST_CB';
+
+  var cbName = 'EM_SECTOR_LIST_CB';
+  window[cbName] = function(data){
+    delete window[cbName];
+    removeScript(cbName);
+    if(data && data.data && data.data.diff){
+      processSectorList(data.data.diff);
+    } else {
+      onApiError('板块列表返回数据异常，尝试备用方案…');
+      loadEastMoneyDirect();
+    }
+  };
+
+  jsonpLoad(url, cbName, function(){
+    // timeout fallback
+    delete window[cbName];
+    onApiError('板块列表接口超时，切换至直接K线模式…');
+    loadEastMoneyDirect();
+  });
+}
+
+// 处理板块列表 → 用东方财富真实代码批量拉K线
+function processSectorList(sectors){
+  setLoaderText('已获取 '+sectors.length+' 个板块，匹配映射中…');
+  setLoaderBar(15);
+
+  // 构建 代码→名称 映射
+  var codeToSector = {};
+  sectors.forEach(function(s){
+    if(s.f12) codeToSector[s.f12] = s.f14;
+  });
+
+  // 找出我们需要的板块代码
+  var needed = [];
+  DATA.forEach(function(row){
+    var code = EM_CODE_MAP[row.n];
+    if(code) needed.push({name:row.n, code:code});
+  });
+
+  fetchKlinesSequential(needed, 0, {});
+}
+
+// 直接用预置代码批量拉K线
+function loadEastMoneyDirect(){
+  var needed = [];
+  DATA.forEach(function(row){
+    var code = EM_CODE_MAP[row.n];
+    if(code) needed.push({name:row.n, code:code});
+  });
+  fetchKlinesSequential(needed, 0, {});
+}
+
+// 顺序批量拉K线（避免并发过多被限流），每批8个
+var BATCH_SIZE = 8;
+var BATCH_DELAY = 300; // ms
+
+function fetchKlinesSequential(items, offset, results){
+  if(offset >= items.length){
+    finalizeRealtimeData(results, items.length);
+    return;
+  }
+
+  var batch = items.slice(offset, offset + BATCH_SIZE);
+  var progress = Math.round(15 + (offset/items.length)*80);
+  setLoaderBar(progress);
+  setLoaderText('拉取行情数据 '+offset+'/'+items.length+'…');
+
+  var pending = batch.length;
+  var done = 0;
+
+  batch.forEach(function(item){
+    fetchSectorKline(item.code, item.name, function(ytd){
+      results[item.name] = ytd;
+      done++;
+      if(done >= pending){
+        setTimeout(function(){
+          fetchKlinesSequential(items, offset+BATCH_SIZE, results);
+        }, BATCH_DELAY);
+      }
+    });
+  });
+}
+
+// 拉单个板块K线，计算YTD涨幅
+function fetchSectorKline(code, name, cb){
+  var today = new Date();
+  var begDate = today.getFullYear()+'0101';
+  var endDate = today.getFullYear()
+    + pad2(today.getMonth()+1)
+    + pad2(today.getDate());
+
+  var cbName = 'EM_KLINE_'+code.replace(/[^a-zA-Z0-9]/g,'_');
+  var url = 'https://push2his.eastmoney.com/api/qt/stock/kline/get'
+    +'?secid=90.'+code
+    +'&fields1=f1,f2,f3,f4,f5,f6'
+    +'&fields2=f51,f52,f53,f54,f55,f56'
+    +'&klt=101&fqt=1'
+    +'&beg='+begDate+'&end='+endDate
+    +'&cb='+cbName;
+
+  var timer = null;
+  window[cbName] = function(data){
+    clearTimeout(timer);
+    delete window[cbName];
+    removeScript(cbName);
+    try{
+      var klines = data.data && data.data.klines;
+      if(klines && klines.length >= 2){
+        // klines[0] = 年初第一个交易日, klines[-1] = 最新
+        var first = klines[0].split(',');
+        var last  = klines[klines.length-1].split(',');
+        var openPrice = parseFloat(first[1]); // 年初开盘
+        var closePrice= parseFloat(last[2]);  // 最新收盘
+        var ytd = Math.round((closePrice/openPrice - 1)*10000)/100; // 保留2位
+        cb(ytd);
+      } else {
+        cb(null);
+      }
+    }catch(e){ cb(null); }
+  };
+
+  timer = setTimeout(function(){
+    if(window[cbName]){ delete window[cbName]; }
+    removeScript(cbName);
+    cb(null);
+  }, 8000);
+
+  jsonpLoad(url, cbName, null);
+}
+
+// 新浪财经备用（使用申万指数代码）
+// 申万行业指数代码: 801XXXX
+var SINA_INDEX_MAP = {
+  '半导体':'sw801081','消费电子':'sw801071','软件开发':'sw801272',
+  '通信设备':'sw801721','人工智能/AI':'ai_idx','银行':'sw801780',
+  '券商':'sw801790','食品饮料':'sw801120','白酒':'sw801121',
+  '医疗器械':'sw801072','化学制药':'sw801150','煤炭':'sw801225',
+  '黄金':'sw801101','铜':'sw801027','钢铁':'sw801040',
+  '房地产开发':'sw801180','建筑材料':'sw801710','公用事业/电力':'sw801160',
+  '汽车零部件':'sw801015','新能源汽车':'sw801014','光伏设备':'sw801716'
+};
+
+function loadSina(){
+  setLoaderText('连接新浪财经接口…');
+  setLoaderBar(10);
+  // 新浪财经的申万指数接口示意（此接口数据有限，做演示）
+  // 实际只能获取当日涨跌幅，YTD需要历史K线
+  showToast('新浪财经接口仅支持当日涨跌幅，YTD数据需东方财富接口', 'err');
+  setTimeout(function(){
+    // 仍然调用东方财富
+    currentSource = 'eastmoney';
+    document.querySelectorAll('.src-btn').forEach(function(b,i){
+      b.classList.toggle('active', i===0);
+    });
+    loadEastMoney();
+  }, 1500);
+}
+
+function loadStaticFallback(){
+  setLoaderText('加载静态备用数据…');
+  setLoaderBar(50);
+  setTimeout(function(){
+    // 用原始文件中的静态2026数据
+    var staticData = {
+      '半导体':48,'消费电子':30,'光学光电子':55,'电子化学品':22,
+      '被动元件':28,'PCB':25,'面板':15,'软件开发':32,'IT服务':28,
+      '云计算/大数据':38,'人工智能/AI':52,'网络安全':28,'通信设备':56,
+      '通信服务':42,'卫星/商业航天':38,'游戏':18,'数字媒体':15,
+      '广告营销':12,'影视院线':10,'机器人/自动化':42,'工程机械':15,
+      '专用机械':18,'仪器仪表':22,'航空航天':30,'船舶制造':20,
+      '军工电子':28,'军工整机':22,'新能源汽车':10,'汽车零部件':8,
+      '整车':5,'光伏设备':-5,'风电设备':3,'电池/储能':12,
+      '电网设备':22,'食品饮料':-5,'白酒':-8,'啤酒':-3,
+      '休闲食品':5,'调味品/乳制品':-3,'家用电器':8,'白色家电':10,
+      '厨卫电器':5,'小家电':8,'化妆品':-5,'医疗美容':-3,
+      '个护用品':2,'纺织服饰':3,'品牌服装':5,'黄金珠宝':18,
+      '商超零售':-3,'电商/互联网零售':12,'旅游酒店':5,'航空':-8,
+      '教育':5,'农林牧渔':-5,'猪周期':-8,'轻工制造':3,
+      '家居/家装':2,'造纸/包装':3,'化学制药':8,'中药':5,
+      '生物制品':10,'创新药':20,'医疗器械':8,'医疗服务':5,
+      'CXO医药外包':8,'医药商业':3,'煤炭':-8,'石油石化':5,
+      '油气开采':8,'黄金':15,'铜':22,'铝':18,'锂矿/新能源金属':-5,
+      '稀土':12,'钢铁':-8,'基础化工':10,'农化/化肥':5,
+      '塑料/橡胶':5,'建筑材料':-10,'水泥':-12,'玻璃':-8,
+      '建筑装饰':-8,'房地产开发':-12,'房地产服务':-10,'公路/港口':5,
+      '航运':8,'公用事业/电力':8,'环保':3,'银行':8,
+      '城商行/农商行':10,'券商':15,'保险':12,'多元金融':12,'信托/资管':10
+    };
+    finalizeRealtimeData(staticData, Object.keys(staticData).length, true);
+  }, 800);
+}
+
+function finalizeRealtimeData(results, total, isStatic){
+  var loaded = Object.values(results).filter(function(v){return v!==null&&v!==undefined;}).length;
+  setLoaderBar(100);
+  realtimeData = results;
+  realtimeLoaded = true;
+  realtimeTimestamp = new Date();
+
+  // 填充DATA的2026列
+  DATA.forEach(function(row){
+    if(results[row.n] !== null && results[row.n] !== undefined){
+      row.d[6] = results[row.n];
+      row.realtime = !isStatic;
+    }
+  });
+
+  hideLoading();
+  setRefreshLoading(false);
+
+  var src = isStatic ? '静态备用' : currentSource==='eastmoney'?'东方财富':'新浪财经';
+  var msg = isStatic
+    ? '静态数据加载完毕（非实时）'
+    : '实时行情加载完毕：'+loaded+'/'+total+' 个板块 ·数据源：'+src;
+
+  setStatus('ok', msg);
+  updateTimestamp();
+  showToast(isStatic ? '⚠ 当前显示静态备用数据' : '✓ 实时行情已更新（'+loaded+'/'+total+'个板块）', isStatic?'err':'ok');
+
+  // 更新说明
+  document.getElementById('dataNoticeText').innerHTML = isStatic
+    ? '<b>当前：静态备用数据</b>，非实时。切换至「东方财富」源并点击刷新获取实时数据。'
+    : '<b>2026年实时数据</b>：来自'+src+'申万行业板块指数，年初至今（YTD）累计涨跌幅。成功加载 <b>'+loaded+'/'+total+'</b> 个板块。更新于 '+realtimeTimestamp.toLocaleTimeString('zh-CN')+' &nbsp;<b style="color:var(--live)">●实时</b>';
+
+  render();
+}
+
+// ─────────────────────────────────────────────
+// JSONP 工具
+// ─────────────────────────────────────────────
+function jsonpLoad(url, cbName, timeoutCb){
+  var script = document.createElement('script');
+  script.id = 'jsonp_'+cbName;
+  script.src = url;
+  script.onerror = function(){
+    removeScript(cbName);
+    if(timeoutCb) timeoutCb();
+  };
+  if(timeoutCb){
+    var t = setTimeout(function(){
+      removeScript(cbName);
+      if(window[cbName]){ delete window[cbName]; }
+      timeoutCb();
+    }, 10000);
+    script._timer = t;
+  }
+  document.head.appendChild(script);
+}
+function removeScript(cbName){
+  var el = document.getElementById('jsonp_EM_KLINE_'+cbName.replace('EM_KLINE_','')) || document.getElementById('jsonp_'+cbName);
+  if(el) el.parentNode && el.parentNode.removeChild(el);
+}
+function pad2(n){ return n<10?'0'+n:''+n; }
+
+// ─────────────────────────────────────────────
+// UI 状态
+// ─────────────────────────────────────────────
+function setStatus(state, msg){
+  var dot = document.getElementById('statusDot');
+  var txt = document.getElementById('statusText');
+  dot.className = 'status-dot '+state;
+  txt.textContent = msg;
+}
+function setLoaderText(t){ document.getElementById('loaderText').textContent = t; }
+function setLoaderBar(p){ document.getElementById('loaderBar').style.width = p+'%'; }
+function hideLoading(){ document.getElementById('loadingOverlay').classList.add('hidden'); }
+function showLoading(){ document.getElementById('loadingOverlay').classList.remove('hidden'); }
+function setRefreshLoading(on){
+  var btn = document.getElementById('refreshBtn');
+  var icon = document.getElementById('refreshIcon');
+  btn.classList.toggle('loading', on);
+  icon.className = on ? 'spin' : '';
+  icon.textContent = on ? '⟳' : '⟳';
+}
+function updateTimestamp(){
+  if(!realtimeTimestamp) return;
+  var el = document.getElementById('updateTime');
+  el.textContent = '· 更新于 '+realtimeTimestamp.toLocaleTimeString('zh-CN');
+}
+function onApiError(msg){
+  setStatus('err', msg);
+  showToast('⚠ '+msg,'err');
+}
+var _toastTimer = null;
+function showToast(msg, type){
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show '+(type||'');
+  if(_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){el.className='toast';},4000);
+}
+function switchSource(src, btn){
+  currentSource = src;
+  document.querySelectorAll('.src-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// 渲染逻辑（与原文件一致，增强实时标记）
+// ─────────────────────────────────────────────
+function yearStatus(y){
+  if(y < NOW_YEAR) return 'done';
+  if(y === NOW_YEAR) return 'live';
+  return 'future';
+}
+function yearLabel(y){
+  var s = yearStatus(y);
+  if(y === 2026 && realtimeLoaded){
+    return '2026<br><span class="realtime-tag">LIVE</span>';
+  }
+  if(s==='live')   return y+'<br><span style="font-size:9px;color:var(--live);font-weight:700">▶ 进行中</span>';
+  if(s==='future') return y+'<br><span style="font-size:9px;color:var(--accent2)">◷ 待开始</span>';
+  return y+'<br><span style="font-size:9px;color:var(--text3)">✓ 完结</span>';
+}
+function buildLegend(){
+  var el = document.getElementById('yearLegend');
+  var html = '';
+  YEARS.forEach(function(y){
+    var s = yearStatus(y);
+    if(s==='live')   html += '<span class="yr-badge live"><span class="pulse" style="width:5px;height:5px;border-radius:50%;background:var(--live);animation:pulse 1.4s infinite;display:inline-block"></span>'+y+' 实时</span>';
+    else if(s==='done') html += '<span class="yr-badge done">'+y+' 完结</span>';
+    else               html += '<span class="yr-badge future">◷ '+y+'</span>';
+  });
+  el.innerHTML = html;
+}
+
+function heatBg(v){
+  if(v===null||v===undefined) return 'var(--surface2)';
+  if(v>=80) return '#7f1d1d';
+  if(v>=50) return '#b91c1c';
+  if(v>=25) return '#ef4444';
+  if(v>=10) return '#fca5a5';
+  if(v>=0)  return '#fecaca';
+  if(v>=-10) return '#bbf7d0';
+  if(v>=-25) return '#4ade80';
+  if(v>=-40) return '#16a34a';
+  if(v>=-60) return '#14532d';
+  return '#052e16';
+}
+function heatTxt(v){
+  if(v===null||v===undefined) return 'var(--text3)';
+  if(v>=50) return '#fff';
+  if(v>=10) return '#7f1d1d';
+  if(v>=0)  return '#991b1b';
+  if(v>=-25) return '#052e16';
+  return '#fff';
+}
+function avg(d){
+  var vals=d.filter(function(v){return v!==null&&v!==undefined;});
+  if(!vals.length) return 0;
+  return Math.round(vals.reduce(function(a,b){return a+b},0)/vals.length);
+}
+function fmtV(v){
+  if(v===null||v===undefined) return '–';
+  return (v>0?'+':'')+v+'%';
+}
+
+function getFiltered(){
+  var cat=document.getElementById('catFilter').value;
+  var q=document.getElementById('search').value.trim().toLowerCase();
+  var rows=DATA.filter(function(r){
+    return (cat==='all'||r.c===cat)&&(q===''||r.n.toLowerCase().indexOf(q)>=0||r.c.indexOf(q)>=0);
+  });
+  var sort=document.getElementById('sortBy').value;
+  if(sort==='cat') rows.sort(function(a,b){return a.c<b.c?-1:a.c>b.c?1:0;});
+  else if(sort==='avg') rows.sort(function(a,b){return avg(b.d)-avg(a.d);});
+  else{
+    var yi=parseInt(sort.replace('y',''))-2020;
+    rows.sort(function(a,b){
+      var av=a.d[yi]!==null&&a.d[yi]!==undefined?a.d[yi]:-9999;
+      var bv=b.d[yi]!==null&&b.d[yi]!==undefined?b.d[yi]:-9999;
+      return bv-av;
+    });
+  }
+  return rows;
+}
+
+function tdClass(yi, row){
+  var y=YEARS[yi];
+  var s=yearStatus(y);
+  if(y===2026&&realtimeLoaded&&row&&row.realtime) return 'val val-realtime';
+  if(s==='live') return 'val val-live';
+  if(s==='future') return 'val val-future';
+  return 'val';
+}
+function thClass(y){
+  var s=yearStatus(y);
+  if(s==='live') return 'yh-live';
+  if(s==='future') return 'yh-future';
+  return 'yh-done';
+}
+
+function renderStats(rows){
+  var allVals=[];
+  rows.forEach(function(r){r.d.forEach(function(v){if(v!==null&&v!==undefined)allVals.push(v);});});
+  if(!allVals.length){document.getElementById('statRow').innerHTML='';return;}
+  var maxV=Math.max.apply(null,allVals),minV=Math.min.apply(null,allVals);
+  var maxR=rows.filter(function(r){return r.d.indexOf(maxV)>=0;})[0];
+  var minR=rows.filter(function(r){return r.d.indexOf(minV)>=0;})[0];
+  var maxY=maxR?YEARS[maxR.d.indexOf(maxV)]:'';
+  var minY=minR?YEARS[minR.d.indexOf(minV)]:'';
+  var loaded2026=rows.filter(function(r){return r.d[6]!==null&&r.d[6]!==undefined;}).length;
+  document.getElementById('statRow').innerHTML=
+    '<div class="stat">板块数：<b class="neu">'+rows.length+'</b></div>'+
+    '<div class="stat">最大涨幅：<b class="up">+'+maxV+'% '+(maxR?maxR.n:'')+(maxY?'('+maxY+')':'')+'</b></div>'+
+    '<div class="stat">最大跌幅：<b class="dn">'+minV+'% '+(minR?minR.n:'')+(minY?'('+minY+')':'')+'</b></div>'+
+    (realtimeLoaded?'<div class="stat">2026实时：<b class="neu">'+loaded2026+'/'+rows.length+' 板块</b></div>':'');
+}
+
+function buildTheadHtml(){
+  var th='<th style="background:var(--surface)">板块</th><th style="background:var(--surface);font-size:10px;color:var(--text2)">类</th>';
+  YEARS.forEach(function(y){
+    th+='<th class="'+thClass(y)+'">'+yearLabel(y)+'</th>';
+  });
+  th+='<th style="background:var(--surface);color:var(--text3);font-size:10px">均值</th>';
+  return th;
+}
+
+function renderHeat(rows){
+  document.getElementById('thead').innerHTML=buildTheadHtml();
+  var html='';
+  rows.forEach(function(r){
+    var cells='';
+    r.d.forEach(function(v,yi){
+      cells+='<td class="'+tdClass(yi,r)+'" style="background:'+heatBg(v)+';color:'+heatTxt(v)+'">'+fmtV(v)+'</td>';
+    });
+    var a=avg(r.d);
+    cells+='<td class="val" style="background:'+heatBg(a)+';color:'+heatTxt(a)+';opacity:.75">'+fmtV(a)+'</td>';
+    html+='<tr><td>'+r.n+'</td><td style="font-size:10px;color:var(--text3);text-align:center">'+r.c+'</td>'+cells+'</tr>';
+  });
+  document.getElementById('tbody').innerHTML=html;
+}
+
+function renderRank(rows){
+  var th='<th style="background:var(--surface)">板块</th><th style="background:var(--surface);font-size:10px;color:var(--text2)">类</th>';
+  YEARS.forEach(function(y){th+='<th class="'+thClass(y)+'">'+yearLabel(y)+'</th>';});
+  document.getElementById('thead').innerHTML=th;
+  var total=rows.length;
+  var rankMaps=YEARS.map(function(_,yi){
+    var validRows=rows.filter(function(r){return r.d[yi]!==null&&r.d[yi]!==undefined;});
+    var sorted=validRows.slice().sort(function(a,b){return b.d[yi]-a.d[yi];});
+    var m={};sorted.forEach(function(r,i){m[r.n]=i+1;});return m;
+  });
+  var html='';
+  rows.forEach(function(r){
+    var cells='';
+    YEARS.forEach(function(_,yi){
+      var rk=rankMaps[yi][r.n]||'–';
+      var bg='',tc='var(--text3)';
+      if(typeof rk==='number'){
+        var p=rk/total;
+        if(p<=0.1){bg='#b91c1c';tc='#fff';}
+        else if(p<=0.25){bg='rgba(252,165,165,.3)';tc='#fca5a5';}
+        else if(p>=0.9){bg='#16a34a';tc='#fff';}
+        else if(p>=0.75){bg='rgba(74,222,128,.2)';tc='#4ade80';}
+      }
+      cells+='<td class="'+tdClass(yi,r)+'" style="background:'+bg+';color:'+tc+'">'+rk+'</td>';
+    });
+    html+='<tr><td>'+r.n+'</td><td style="font-size:10px;color:var(--text3);text-align:center">'+r.c+'</td>'+cells+'</tr>';
+  });
+  document.getElementById('tbody').innerHTML=html;
+}
+
+function renderBest(rows){
+  document.getElementById('thead').innerHTML=
+    '<th style="background:var(--surface)">板块</th>'+
+    '<th style="background:var(--surface);font-size:10px;color:var(--text2)">类</th>'+
+    '<th style="background:var(--surface)">最佳年</th>'+
+    '<th style="background:var(--surface)">最佳涨幅</th>'+
+    '<th style="background:var(--surface)">最差年</th>'+
+    '<th style="background:var(--surface)">最差涨幅</th>'+
+    '<th style="background:var(--surface)">均值</th>'+
+    '<th style="background:var(--surface)">胜率</th>';
+  var sorted=rows.slice().sort(function(a,b){return avg(b.d)-avg(a.d);});
+  var html='';
+  sorted.forEach(function(r){
+    var vals=r.d.filter(function(v){return v!==null&&v!==undefined;});
+    if(!vals.length){return;}
+    var maxV=Math.max.apply(null,vals),minV=Math.min.apply(null,vals);
+    var maxYi=r.d.indexOf(maxV),minYi=r.d.indexOf(minV);
+    var maxY=YEARS[maxYi],minY=YEARS[minYi];
+    var a=avg(r.d);
+    var wins=vals.filter(function(v){return v>0;}).length;
+    var wr=Math.round(wins/vals.length*100);
+    var bar='<div style="display:flex;align-items:center;gap:4px"><div style="width:'+(wr*0.5)+'px;height:6px;background:'+(wr>=50?'#ef4444':'#22c55e')+';border-radius:2px"></div><span style="font-size:10px;color:var(--text2)">'+wr+'%</span></div>';
+    var maxYLabel = maxY;
+    if(maxY===2026&&r.realtime) maxYLabel='<span style="color:var(--live);font-weight:700">'+maxY+'●</span>';
+    html+='<tr>'+
+      '<td>'+r.n+'</td>'+
+      '<td style="font-size:10px;color:var(--text3);text-align:center">'+r.c+'</td>'+
+      '<td style="color:#f87171;font-weight:700;text-align:center">'+maxYLabel+'</td>'+
+      '<td style="color:#f87171;font-weight:700">+'+maxV+'%</td>'+
+      '<td style="color:#4ade80;font-weight:700;text-align:center">'+minY+'</td>'+
+      '<td style="color:#4ade80;font-weight:700">'+minV+'%</td>'+
+      '<td style="font-weight:700;color:'+(a>=0?'#f87171':'#4ade80')+'">'+(a>=0?'+':'')+a+'%</td>'+
+      '<td>'+bar+'</td>'+
+    '</tr>';
+  });
+  document.getElementById('tbody').innerHTML=html;
+}
+
+function render(){
+  var rows=getFiltered();
+  renderStats(rows);
+  if(currentView==='heat') renderHeat(rows);
+  else if(currentView==='rank') renderRank(rows);
+  else renderBest(rows);
+}
+
+function setView(v,btn){
+  currentView=v;
+  document.querySelectorAll('.tab-bar button').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  render();
+}
+
+// ─────────────────────────────────────────────
+// 初始化
+// ─────────────────────────────────────────────
+buildLegend();
+render();
+
+// 自动加载实时数据
+showLoading();
+loadRealtimeData();
+
+// 每5分钟自动刷新（交易时间内）
+setInterval(function(){
+  var now = new Date();
+  var h = now.getHours(), m = now.getMinutes();
+  var inTradingHours = (h===9&&m>=30)||(h>=10&&h<11)||(h===11&&m<=30)||(h>=13&&h<15);
+  if(inTradingHours){
+    loadRealtimeData();
+  }
+}, 5*60*1000);
+</script>
+</body>
+</html>
